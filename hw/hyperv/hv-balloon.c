@@ -249,7 +249,7 @@ static uint64_t hv_balloon_total_removed_rs(HvBalloon *balloon,
 
     total_removed = SUM_SATURATE_U64(balloon->removed_guest_ctr,
                                      balloon->removed_both_ctr);
-
+    warn_report("xj: hv_balloon_total_removed_rs total_removed:%lu, ram_size_pages:%lu", total_removed, ram_size_pages);
     /* possible if guest returns pages outside actual RAM */
     if (total_removed > ram_size_pages) {
         total_removed = ram_size_pages;
@@ -637,6 +637,7 @@ static void hv_balloon_idle_state_process_target(HvBalloon *balloon,
     ram_size_pages = hv_balloon_total_ram(balloon);
     total_removed = hv_balloon_total_removed_rs(balloon, ram_size_pages);
     warn_report("xj hv_balloon_idle_state_process_target");
+    warn_report("xj total_removed:%lu, ram_size_pages:%lu", total_removed, ram_size_pages);
     /*
      * we need to cache the values computed from the balloon target value when
      * starting the adjustment procedure in case someone changes the target when
@@ -747,14 +748,15 @@ static void hv_balloon_remove_response_handle_range(HvBalloon *balloon,
     }
 
     trace_hv_balloon_remove_response(range->count, range->start, both);
-
+    warn_report("xj hv_balloon_remove_response_handle_range ");
     if (our_range) {
         /* Includes the not-yet-hot-added and unusable parts. */
         rangeeff = our_range->range;
     } else {
         rangeeff.start = rangeeff.count = 0;
+        warn_report("xj hv_balloon_remove_response_handle_range set 0");
     }
-
+    warn_report("xj hv_balloon_remove_response_handle_range 2");
     if (page_range_intersection_size(range, rangeeff.start, rangeeff.count) > 0) {
         PageRangeTree ourtree = our_range_get_removed_tree(our_range, both);
         PageRange rangehole, rangecommon;
@@ -1306,6 +1308,7 @@ static void hv_balloon_handle_packet(HvBalloon *balloon, HvBalloonReq *req,
         break;
 
     case DM_BALLOON_RESPONSE:
+        warn_report("xj: hv_balloon_handle_packet DM_BALLOON_RESPONSE");
         hv_balloon_handle_balloon_response(balloon, req, stdesc);
         break;
 
@@ -1496,7 +1499,7 @@ static void hv_balloon_vmdev_realize(VMBusDevice *vdev, Error **errp)
     int ret;
 
     balloon->state = S_WAIT_RESET;
-
+    warn_report("xj hv_balloon_vmdev_realize");
     ret = qemu_add_balloon_handler(hv_balloon_to_target, hv_balloon_stat,
                                    balloon);
     if (ret < 0) {
@@ -1555,7 +1558,7 @@ out_balloon_handler:
 static void hv_balloon_vmdev_reset(VMBusDevice *vdev)
 {
     HvBalloon *balloon = HV_BALLOON(vdev);
-
+    warn_report("xj hv_balloon_vmdev_reset %d", balloon->state);
     if (balloon->state == S_POST_RESET_CLOSED) {
         return;
     }
@@ -1575,6 +1578,7 @@ static void hv_balloon_vmdev_reset(VMBusDevice *vdev)
 
     HV_BALLOON_SET_STATE(balloon, S_POST_RESET_CLOSED);
     hv_balloon_event_loop(balloon);
+    warn_report("xj hv_balloon_vmdev_reset .. 2");
 }
 
 /*
