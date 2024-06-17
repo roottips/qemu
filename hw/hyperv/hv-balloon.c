@@ -371,7 +371,7 @@ static void hv_balloon_unballoon_posting(HvBalloon *balloon, StateDesc *stdesc)
     PageRange range;
     bool bret;
     ssize_t ret;
-
+    warn_report("xj hv_balloon_unballoon_posting");
     assert(balloon->state == S_UNBALLOON_POSTING);
     assert(balloon->unballoon_diff > 0);
 
@@ -431,7 +431,7 @@ static bool hv_balloon_our_range_ensure(HvBalloon *balloon)
     MemoryRegion *hostmem_mr;
     g_autoptr(OurRangeMemslots) our_range_memslots = NULL;
     OurRange *our_range;
-
+    warn_report("xj hv_balloon_our_range_ensure");
     if (balloon->our_range) {
         return true;
     }
@@ -588,7 +588,7 @@ static void hv_balloon_balloon_rb_wait(HvBalloon *balloon, StateDesc *stdesc)
 {
     VMBusChannel *chan = hv_balloon_get_channel(balloon);
     size_t bl_size = sizeof(struct dm_balloon);
-
+    warn_report("xj hv_balloon_balloon_rb_wait");
     assert(balloon->state == S_BALLOON_RB_WAIT);
 
     if (vmbus_channel_reserve(chan, 0, bl_size) < 0) {
@@ -604,7 +604,7 @@ static void hv_balloon_balloon_posting(HvBalloon *balloon, StateDesc *stdesc)
     struct dm_balloon bl;
     size_t bl_size = sizeof(bl);
     ssize_t ret;
-
+    warn_report("xj hv_balloon_balloon_posting");
     assert(balloon->state == S_BALLOON_POSTING);
     assert(balloon->balloon_diff > 0);
 
@@ -633,10 +633,10 @@ static void hv_balloon_idle_state_process_target(HvBalloon *balloon,
 {
     bool can_balloon = balloon->caps.cap_bits.balloon;
     uint64_t ram_size_pages, total_removed;
-
+    
     ram_size_pages = hv_balloon_total_ram(balloon);
     total_removed = hv_balloon_total_removed_rs(balloon, ram_size_pages);
-
+    warn_report("xj hv_balloon_idle_state_process_target");
     /*
      * we need to cache the values computed from the balloon target value when
      * starting the adjustment procedure in case someone changes the target when
@@ -666,6 +666,7 @@ static void hv_balloon_idle_state_process_target(HvBalloon *balloon,
         balloon->balloon_diff = ram_size_pages - total_removed -
             balloon->target;
         HV_BALLOON_STATE_DESC_SET(stdesc, S_BALLOON_RB_WAIT);
+        warn_report("xj hv_balloon_idle_state_process_target: S_BALLOON_RB_WAIT");
     }
 }
 
