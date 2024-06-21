@@ -1644,14 +1644,19 @@ static uint16_t vmbus_recv_message(const struct hyperv_post_message_input *msg,
 {
     VMBus *vmbus = data;
     struct vmbus_message_header *vmbus_msg;
+    
+    warn_report("xj vmbus_recv_message 0");
+    warn_report("xj vmbus_recv_message type:%d", msg->message_type);
 
     if (msg->message_type != HV_MESSAGE_VMBUS) {
         return HV_STATUS_INVALID_HYPERCALL_INPUT;
     }
+    warn_report("xj vmbus_recv_message 1");
 
     if (msg->payload_size < sizeof(struct vmbus_message_header)) {
         return HV_STATUS_INVALID_HYPERCALL_INPUT;
     }
+    warn_report("xj vmbus_recv_message 2");
 
     vmbus_msg = (struct vmbus_message_header *)msg->payload;
 
@@ -1663,10 +1668,11 @@ static uint16_t vmbus_recv_message(const struct hyperv_post_message_input *msg,
                      vmbus_msg->message_type);
         return HV_STATUS_INVALID_HYPERCALL_INPUT;
     }
-
+    warn_report("xj vmbus_recv_message 3");
     if (enqueue_incoming_message(vmbus, msg)) {
         return HV_STATUS_INSUFFICIENT_BUFFERS;
     }
+    warn_report("xj vmbus_recv_message done...");
     return HV_STATUS_SUCCESS;
 }
 
@@ -1751,6 +1757,7 @@ static void handle_initiate_contact(VMBus *vmbus,
                                     vmbus_message_initiate_contact *msg,
                                     uint32_t msglen)
 {
+    warn_report("xj handle_initiate_contact ");
     if (msglen < sizeof(*msg)) {
         return;
     }
@@ -1766,7 +1773,9 @@ static void handle_initiate_contact(VMBus *vmbus,
      * before handing over to OS loader.
      */
     vmbus_reset_all(vmbus);
-
+    warn_report("xj handle_initiate_contact 2");
+    warn_report("xj handle_initiate_contact target_vp : %u, version_req: %u ,VMBUS_VERSION_WIN8: %u", msg->target_vcpu, msg->version_requested, VMBUS_VERSION_WIN8);
+    warn_report("xj handle_initiate_contact interrupt_page: %lu, monitor_page1: %lu monitor_page2: %lu", msg->interrupt_page, msg->monitor_page1, msg->monitor_page2);
     vmbus->target_vp = msg->target_vcpu;
     vmbus->version = msg->version_requested;
     if (vmbus->version < VMBUS_VERSION_WIN8) {
@@ -2185,6 +2194,46 @@ static bool complete_unload(VMBus *vmbus)
     return true;
 }
 
+static void reset_init(VMBus *vmbus)
+{
+    struct hyperv_post_message_input *hv_msg;
+    struct vmbus_message_header *msg;
+    struct vmbus_message_initiate_contact *init_msg;
+    void *msgdata;
+    uint32_t msglen;
+    //VMBus mybus;
+    //VMBus *vmbus = &mybus;
+
+    vmbus->rx_queue_size = 1;
+    //vmbus->in_progress = 1;
+    vmbus->rx_queue_head = 1;
+    
+    hv_msg = &vmbus->rx_queue[vmbus->rx_queue_head];
+    hv_msg->payload_size= 40;
+    msglen =  hv_msg->payload_size;
+
+    msgdata = hv_msg->payload;
+    msg = msgdata;
+    
+    msg->message_type = VMBUS_MSG_INITIATE_CONTACT;
+    msg->_padding = 0;
+
+    init_msg = msgdata;
+    init_msg->version_requested = 65537;
+    init_msg->target_vcpu = 0;
+    init_msg->interrupt_page = 18213740544;
+    init_msg->monitor_page1 = 1073356800;
+    init_msg->monitor_page2 = 1073360896;
+    
+    (void) msgdata;
+    (void) msglen;
+    //trace_vmbus_process_incoming_message(msg->message_type);
+    //handle_initiate_contact(vmbus, msgdata, msglen);
+    
+}
+
+
+static int init_count = 0;
 static void process_message(VMBus *vmbus)
 {
     struct hyperv_post_message_input *hv_msg;
@@ -2192,22 +2241,32 @@ static void process_message(VMBus *vmbus)
     void *msgdata;
     uint32_t msglen;
 
+    warn_report("xj vmbus process_message");
     qemu_mutex_lock(&vmbus->rx_queue_lock);
 
     if (!vmbus->rx_queue_size) {
+        warn_report("xj add  vmbus reset_init");   
+	    if (init_count == 0) { 
+		 if (0) reset_init(vmbus);
+	         init_count =  (init_count + 1) % 1000;
+		 
+		 //goto out;
+	    }
         goto unlock;
     }
-
+    warn_report("xj vmbus rx_queue_size:%d, state:%d", vmbus->rx_queue_size, vmbus->state);
+    warn_report("xj vmbus process_message 1");
     hv_msg = &vmbus->rx_queue[vmbus->rx_queue_head];
     msglen =  hv_msg->payload_size;
     if (msglen < sizeof(*msg)) {
         goto out;
     }
+    warn_report("xj vmbus process_message 2");
     msgdata = hv_msg->payload;
     msg = msgdata;
 
     trace_vmbus_process_incoming_message(msg->message_type);
-
+    warn_report("xj vmbus process_message: len: %d type:%u", msglen, msg->message_type);
     switch (msg->message_type) {
     case VMBUS_MSG_INITIATE_CONTACT:
         handle_initiate_contact(vmbus, msgdata, msglen);
@@ -2239,6 +2298,7 @@ static void process_message(VMBus *vmbus)
     }
 
 out:
+    warn_report("xj vmbus process_message out -1-0");
     vmbus->rx_queue_size--;
     vmbus->rx_queue_head++;
     vmbus->rx_queue_head %= HV_MSG_QUEUE_LEN;
@@ -2246,6 +2306,7 @@ out:
     vmbus_resched(vmbus);
 unlock:
     qemu_mutex_unlock(&vmbus->rx_queue_lock);
+    warn_report("xj vmbus process_message done ..");
 }
 
 static const struct {
@@ -2424,7 +2485,7 @@ static void vmbus_dev_reset(DeviceState *dev)
     uint16_t i;
     VMBusDevice *vdev = VMBUS_DEVICE(dev);
     VMBusDeviceClass *vdc = VMBUS_DEVICE_GET_CLASS(vdev);
-
+    warn_report("xj vmbus_dev_reset");
     if (vdev->channels) {
         for (i = 0; i < vdev->num_channels; i++) {
             VMBusChannel *chan = &vdev->channels[i];
@@ -2436,6 +2497,7 @@ static void vmbus_dev_reset(DeviceState *dev)
     if (vdc->vmdev_reset) {
         vdc->vmdev_reset(vdev);
     }
+    warn_report("xj vmbus_dev_reset done");
 }
 
 static void vmbus_dev_unrealize(DeviceState *dev)
@@ -2589,7 +2651,7 @@ static int vmbus_pre_load(void *opaque)
 {
     VMBusChannel *chan;
     VMBus *vmbus = VMBUS(opaque);
-
+    warn_report("xj vmbus_pre_load");
     /*
      * channel IDs allocated by the source will come in the migration stream
      * for each channel, so clean up the ones allocated at realize
@@ -2600,18 +2662,26 @@ static int vmbus_pre_load(void *opaque)
 
     return 0;
 }
+
+//static void vmbus_restore(VMBus *vmbus)
+//{
+//    vmbus_init(vmbus);
+//}
+
+//static int restore_count = 0;
 static int vmbus_post_load(void *opaque, int version_id)
 {
     int ret;
     VMBus *vmbus = VMBUS(opaque);
     VMBusGpadl *gpadl;
     VMBusChannel *chan;
-
+    warn_report("xj vmbus_post_load start");
+    warn_report("xj vmbus_post_load, vmbus->target_vp: %u", vmbus->target_vp);
     ret = vmbus_init(vmbus);
     if (ret) {
         return ret;
     }
-
+    warn_report("xj vmbus_post_load 2");
     QTAILQ_FOREACH(gpadl, &vmbus->gpadl_list, link) {
         gpadl->vmbus = vmbus;
         gpadl->refcount = 1;
@@ -2622,6 +2692,20 @@ static int vmbus_post_load(void *opaque, int version_id)
      * instead of channel_post_load()
      */
     QTAILQ_FOREACH(chan, &vmbus->channel_list, link) {
+        warn_report("xj vmbus_post_load state: %d, vm_state: %d ", chan->state, vmbus->state );
+        if (vmbus->state == 0 && chan->state == 0) {
+	    if (!chan->gpadl) {
+		 warn_report("xj vmbus_post_load chan borken");
+	         //warn_report("xj ");
+		 chan->gpadl = g_new0(VMBusGpadl, 1);
+		 send_create_gpadl(vmbus);
+		 //handle_open_channel(vmbus, );
+		 //send_create_gpadl(vmbus);  // crash 
+	         //vmbus_resched(vmbus);
+		 //return 0;
+		 continue;
+	    }
+	}
 
         if (chan->state == VMCHAN_OPENING || chan->state == VMCHAN_OPEN) {
             open_channel(chan);
@@ -2633,6 +2717,7 @@ static int vmbus_post_load(void *opaque, int version_id)
 
         if (!vmbus_channel_is_open(chan)) {
             /* reopen failed, abort loading */
+            warn_report("xj vmbus_post_load failed -1");
             return -1;
         }
 
@@ -2641,7 +2726,7 @@ static int vmbus_post_load(void *opaque, int version_id)
         /* ditto on the host side */
         vmbus_channel_notify_host(chan);
     }
-
+    warn_report("xj vmbus_post_load 3");
     vmbus_resched(vmbus);
     return 0;
 }

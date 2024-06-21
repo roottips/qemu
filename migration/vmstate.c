@@ -369,7 +369,7 @@ int vmstate_save_state_v(QEMUFile *f, const VMStateDescription *vmsd,
         json_writer_int64(vmdesc, "version", version_id);
         json_writer_start_array(vmdesc, "fields");
     }
-
+    warn_report("xj: vmstate_save_state_v filed->name : %s ", field->name);
     while (field->name) {
         if (vmstate_field_exists(vmsd, field, opaque, version_id)) {
             void *first_elem = opaque + field->offset;
@@ -397,15 +397,19 @@ int vmstate_save_state_v(QEMUFile *f, const VMStateDescription *vmsd,
                     assert(field->flags & VMS_ARRAY_OF_POINTER);
                     ret = vmstate_info_nullptr.put(f, curr_elem, size, NULL,
                                                    NULL);
-                } else if (field->flags & VMS_STRUCT) {
-                    ret = vmstate_save_state(f, field->vmsd, curr_elem,
+                    warn_report("xj: vmstate_save_state_v vmstate_info_nullptr.put ");
+		} else if (field->flags & VMS_STRUCT) {
+                    warn_report("xj vmstate_save_state");
+			ret = vmstate_save_state(f, field->vmsd, curr_elem,
                                              vmdesc_loop);
                 } else if (field->flags & VMS_VSTRUCT) {
-                    ret = vmstate_save_state_v(f, field->vmsd, curr_elem,
+                    warn_report("xj vmstate_save_state_v");
+			ret = vmstate_save_state_v(f, field->vmsd, curr_elem,
                                                vmdesc_loop,
                                                field->struct_version_id, errp);
                 } else {
-                    ret = field->info->put(f, curr_elem, size, field,
+                    warn_report("xj field->info->put ");
+			ret = field->info->put(f, curr_elem, size, field,
                                      vmdesc_loop);
                 }
                 if (ret) {

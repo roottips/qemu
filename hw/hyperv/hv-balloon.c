@@ -249,7 +249,7 @@ static uint64_t hv_balloon_total_removed_rs(HvBalloon *balloon,
 
     total_removed = SUM_SATURATE_U64(balloon->removed_guest_ctr,
                                      balloon->removed_both_ctr);
-    warn_report("xj: hv_balloon_total_removed_rs total_removed:%u, ram_size_pages:%u", total_removed, ram_size_pages);
+    warn_report("xj: hv_balloon_total_removed_rs total_removed:%lu, ram_size_pages:%lu", total_removed, ram_size_pages);
     /* possible if guest returns pages outside actual RAM */
     if (total_removed > ram_size_pages) {
         total_removed = ram_size_pages;
@@ -637,7 +637,7 @@ static void hv_balloon_idle_state_process_target(HvBalloon *balloon,
     ram_size_pages = hv_balloon_total_ram(balloon);
     total_removed = hv_balloon_total_removed_rs(balloon, ram_size_pages);
     warn_report("xj hv_balloon_idle_state_process_target");
-    warn_report("xj total_removed:%u, ram_size_pages:%u", total_removed, ram_size_pages);
+    warn_report("xj total_removed:%lu, ram_size_pages:%lu", total_removed, ram_size_pages);
     /*
      * we need to cache the values computed from the balloon target value when
      * starting the adjustment procedure in case someone changes the target when
